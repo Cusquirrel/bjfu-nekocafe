@@ -1,0 +1,50 @@
+openapi: 3.0.3
+info:
+  title: NekoCafe Lab3 API
+  version: 1.0.0
+paths:
+  /api/health:
+    get:
+      summary: health check
+      responses: { '200': { description: OK } }
+  /api/stores:
+    get:
+      summary: list stores
+      responses: { '200': { description: OK } }
+  /api/stores/{storeId}/slots:
+    get:
+      summary: query available slots
+      parameters:
+        - { name: storeId, in: path, required: true, schema: { type: integer } }
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses: { '200': { description: OK } }
+  /api/reservations:
+    post:
+      summary: create reservation with idempotency requestId
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, storeId, visitDate, slot, partySize, requestId]
+              properties:
+                userId: { type: integer }
+                storeId: { type: integer }
+                visitDate: { type: string, format: date }
+                slot: { type: string, example: '10:00-12:00' }
+                partySize: { type: integer, minimum: 1, maximum: 6 }
+                requestId: { type: string }
+      responses: { '200': { description: created }, '400': { description: business error } }
+  /api/cats:
+    get:
+      summary: list cats
+      responses: { '200': { description: OK } }
+  /api/cats/{catId}/health-records:
+    post:
+      summary: append cat health or interaction status record
+      responses: { '200': { description: OK } }
+  /api/dashboard/overview:
+    get:
+      summary: operational metrics overview
+      responses: { '200': { description: OK } }

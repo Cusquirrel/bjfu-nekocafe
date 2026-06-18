@@ -1,0 +1,41 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Java/Maven
+target/
+*.class
+*.jar
+*.war
+*.log
+.mvn/
+
+# Node.js
+node_modules/
+dist/
+.cache/
+.env
+.env.local
+.env.*.local
+
+# Docker volumes
+db-data/
+redis-data/
+
+# Build artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Helm
+*.tgz
+.github/

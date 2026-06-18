@@ -1,0 +1,26 @@
+backend:
+  image: nekocafe/backend:1.0.0
+  replicas: 2
+  port: 8080
+frontend:
+  image: nekocafe/frontend:1.0.0
+  replicas: 2
+  port: 80
+postgres:
+  host: postgres
+  database: nekocafe
+  username: nekocafe
+  passwordSecret: nekocafe-db-secret
+redis:
+  host: redis
+  port: 6379
+ingress:
+  enabled: true
+  host: nekocafe.local
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 768Mi

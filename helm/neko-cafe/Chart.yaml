@@ -1,0 +1,5 @@
+apiVersion: v2
+name: neko-cafe
+version: 0.1.0
+appVersion: "1.0.0"
+description: Helm chart for NekoCafe Lab3 deployment
