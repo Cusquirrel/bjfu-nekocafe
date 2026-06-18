@@ -14,5 +14,5 @@ vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo) => {
 
 test('renders NekoCafe dashboard entry', async () => {
   render(<QueryClientProvider client={new QueryClient()}><App /></QueryClientProvider>);
-  expect(await screen.findByText(/NekoCafé 智慧猫咖预约平台/)).toBeTruthy();
+  expect(await screen.findByText(/NekoCafe 智慧猫咖预约平台/)).toBeTruthy();
 });
