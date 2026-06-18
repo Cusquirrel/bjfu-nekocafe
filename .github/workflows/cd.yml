@@ -1,0 +1,20 @@
+name: NekoCafe CD Demo
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: target environment
+        default: staging
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Helm lint
+        run: helm lint helm/neko-cafe || true
+      - name: Render Kubernetes manifests
+        run: helm template nekocafe helm/neko-cafe --values helm/neko-cafe/values-staging.yaml > rendered.yaml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rendered-k8s-manifests
+          path: rendered.yaml

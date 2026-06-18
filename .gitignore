@@ -38,4 +38,3 @@ yarn-error.log*
 
 # Helm
 *.tgz
-.github/
