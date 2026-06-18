@@ -13,6 +13,14 @@
     <name>nekocafe-lab3</name>
     <properties>
         <java.version>1.8</java.version>
+        <jacoco.version>0.8.13</jacoco.version>
+        <jqwik.version>1.8.5</jqwik.version>
+        <pitest.version>1.15.8</pitest.version>
+        <testcontainers.version>1.19.8</testcontainers.version>
+        <skipITs>true</skipITs>
+        <jacoco.skip>true</jacoco.skip>
+        <jacoco.dataFile>${java.io.tmpdir}/nekocafe-jacoco.exec</jacoco.dataFile>
+        <surefireArgLine></surefireArgLine>
     </properties>
     <dependencies>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
@@ -23,17 +31,142 @@
         <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>
         <dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>test</scope></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+        <dependency><groupId>net.jqwik</groupId><artifactId>jqwik</artifactId><version>${jqwik.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId><version>${testcontainers.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><version>${testcontainers.version}</version><scope>test</scope></dependency>
     </dependencies>
     <build>
         <plugins>
             <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
             <plugin>
-                <groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId><version>0.8.12</version>
+                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.2.5</version>
+                <configuration>
+                    <argLine>@{surefireArgLine}</argLine>
+                    <reuseForks>true</reuseForks>
+                    <includes>
+                        <include>**/*Test.java</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/*IT.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId><version>3.2.5</version>
+                <configuration>
+                    <argLine>@{surefireArgLine}</argLine>
+                    <reuseForks>true</reuseForks>
+                    <skipITs>${skipITs}</skipITs>
+                    <includes>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals><goal>integration-test</goal><goal>verify</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId><version>${jacoco.version}</version>
+                <configuration>
+                    <skip>${jacoco.skip}</skip>
+                    <propertyName>surefireArgLine</propertyName>
+                    <destFile>${jacoco.dataFile}</destFile>
+                    <dataFile>${jacoco.dataFile}</dataFile>
+                    <append>false</append>
+                </configuration>
                 <executions>
                     <execution><goals><goal>prepare-agent</goal></goals></execution>
-                    <execution><id>report</id><phase>test</phase><goals><goal>report</goal></goals></execution>
+                    <execution>
+                        <id>report</id><phase>test</phase><goals><goal>report</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.basedir}/../tests/reports/jacoco</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.70</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.60</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-antrun-plugin</artifactId><version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>copy-quality-reports</id>
+                        <phase>test</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.basedir}/../tests/reports"/>
+                                <copy file="${project.basedir}/../tests/reports/jacoco/index.html"
+                                      tofile="${project.basedir}/../tests/reports/coverage.html"
+                                      failonerror="false"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.pitest</groupId><artifactId>pitest-maven</artifactId><version>${pitest.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-junit5-plugin</artifactId>
+                        <version>1.2.1</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <targetClasses>
+                        <param>com.bjfu.nekocafe.*</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>com.bjfu.nekocafe.*Test</param>
+                    </targetTests>
+                    <mutationThreshold>60</mutationThreshold>
+                    <timestampedReports>false</timestampedReports>
+                    <reportsDirectory>${project.basedir}/../tests/reports/pit</reportsDirectory>
+                    <outputFormats>
+                        <param>HTML</param>
+                        <param>XML</param>
+                    </outputFormats>
+                </configuration>
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>testcontainers</id>
+            <properties>
+                <skipITs>false</skipITs>
+            </properties>
+        </profile>
+        <profile>
+            <id>coverage</id>
+            <properties>
+                <jacoco.skip>false</jacoco.skip>
+            </properties>
+        </profile>
+    </profiles>
 </project>

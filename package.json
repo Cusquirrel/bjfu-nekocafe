@@ -1,0 +1,16 @@
+{
+  "name": "nekocafe-quality-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "test:a11y": "playwright test --config tests/accessibility/playwright.config.ts",
+    "lighthouse:home": "lighthouse http://127.0.0.1:3000 --output=html --output-path=tests/reports/lighthouse-home.html --chrome-flags=\"--headless=new --no-sandbox\""
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "~4.10.1",
+    "@playwright/test": "~1.49.0",
+    "lighthouse": "~12.2.2"
+  }
+}

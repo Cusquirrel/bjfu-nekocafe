@@ -1,0 +1,18 @@
+{
+  "consumer": { "name": "order" },
+  "provider": { "name": "payment" },
+  "interactions": [
+    {
+      "description": "order pays through mock payment provider",
+      "request": { "method": "POST", "path": "/api/orders/1/pay" },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "data": { "id": 1, "status": "PAID", "payment_channel": "MOCK_PAY" }
+        }
+      }
+    }
+  ],
+  "metadata": { "pactSpecification": { "version": "3.0.0" } }
+}

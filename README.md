@@ -57,6 +57,17 @@ npm run test
 npm run build
 ```
 
+## 实验四质量工程测试体系
+
+本项目已在原 NekoCafe 工程内补充实验四质量工程资产，不另建独立项目：
+
+- 后端：JUnit5 单元测试、jqwik PBT、MockMvc 契约测试、H2 集成测试、Testcontainers PostgreSQL 集成测试、JaCoCo 覆盖率、PIT 变异测试。
+- 前端：React/Vitest 组件与 API 测试、Playwright 三条用户旅程、axe 与 Lighthouse 可访问性测试。
+- 非功能：k6 预约接口性能测试、OWASP ZAP Baseline、SonarQube 配置、GitHub Actions 质量门禁。
+- 覆盖模块：预约、会员、猫咪照护、推荐、订单支付、运营看板、权限审计，并包含“橘猫不能被识别为橘子套餐”回归测试。
+
+报告统一输出到 `tests/reports`，关键入口包括 `coverage.html`、`mutation.html`、`pact.html`、`playwright-report`、`k6-summary.json`、`zap_report.html`、`lighthouse-home.html`。详细命令见 `docs/testing.md`。
+
 ## 目录说明
 
 ```text
@@ -67,7 +78,12 @@ infra/docker/             Docker 相关配置
 infra/observability/      Prometheus、Grafana、告警规则
 helm/neko-cafe/           Kubernetes Helm Chart
 .github/workflows/        CI/CD 流水线配置
-tests/performance/        k6 性能测试脚本
+tests/perf/               实验四 k6 性能测试脚本
+tests/e2e/                Playwright E2E 用户旅程
+tests/accessibility/      axe 与 Lighthouse 可访问性测试
+tests/security/           OWASP ZAP Baseline 配置
+tests/reports/            质量报告输出目录
+tests/performance/        实验三保留的 k6 性能测试脚本
 tests/smoke/              冒烟测试脚本
 docs/                     接口、部署、测试说明
 ```

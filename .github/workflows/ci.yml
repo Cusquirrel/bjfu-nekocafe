@@ -1,43 +1,253 @@
-name: NekoCafe CI
+name: NekoCafe Quality Gates
+
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
-  backend-test:
+  backend-quality:
+    name: Backend JUnit jqwik contract coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '8' }
-      - name: Backend unit and integration tests
+        with:
+          distribution: temurin
+          java-version: '8'
+          cache: maven
+      - name: Run unit, property, contract and MockMvc integration tests
         working-directory: backend
-        run: mvn -B test
-      - name: Upload coverage
+        run: mvn -B -Pcoverage verify -DskipITs=true
+      - name: Upload backend reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backend-jacoco-report
-          path: backend/target/site/jacoco
-  frontend-build:
+          name: backend-quality-reports
+          path: |
+            tests/reports/coverage.html
+            tests/reports/pact.html
+            tests/reports/jacoco/**
+            backend/target/surefire-reports/**
+
+  testcontainers:
+    name: Testcontainers PostgreSQL integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+          cache: maven
+      - name: Run containerized integration tests
+        working-directory: backend
+        run: mvn -B -Ptestcontainers verify -Djacoco.skip=true
+      - name: Upload Testcontainers reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testcontainers-reports
+          path: |
+            backend/target/surefire-reports/**
+            backend/target/failsafe-reports/**
+
+  frontend-quality:
+    name: React Vitest coverage build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '22' }
-      - name: Install and test frontend
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
         working-directory: frontend
-        run: |
-          npm install
-          npm run test
-          npm run build
-  docker-build:
+        run: npm install
+      - name: Run Vitest coverage
+        working-directory: frontend
+        run: npm run test:coverage
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: tests/reports/frontend-coverage/**
+
+  mutation:
+    name: PIT mutation report
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-build]
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - name: Build images
-        run: docker compose build
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+          cache: maven
+      - name: Run PIT mutation testing
+        working-directory: backend
+        run: mvn -B org.pitest:pitest-maven:mutationCoverage
+      - name: Normalize mutation report name
+        if: always()
+        run: |
+          mkdir -p tests/reports
+          if [ -f tests/reports/pit/index.html ]; then
+            cp tests/reports/pit/index.html tests/reports/mutation.html
+          fi
+      - name: Upload mutation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-reports
+          path: |
+            tests/reports/mutation.html
+            tests/reports/pit/**
+
+  e2e-accessibility:
+    name: Playwright E2E axe Lighthouse
+    runs-on: ubuntu-latest
+    needs: [backend-quality, frontend-quality]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install quality tool dependencies
+        run: npm install
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Start application stack
+        run: docker compose up -d --build postgres redis backend frontend
+      - name: Wait for backend and frontend
+        run: |
+          timeout 180 bash -c 'until curl -fsS http://127.0.0.1:8080/api/health; do sleep 5; done'
+          timeout 180 bash -c 'until curl -fsS http://127.0.0.1:3000; do sleep 5; done'
+      - name: Run three Playwright user journeys
+        run: npm run test:e2e
+      - name: Run axe accessibility assertions
+        run: npm run test:a11y
+      - name: Run Lighthouse home audit
+        run: npm run lighthouse:home
+      - name: Upload browser reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-quality-reports
+          path: |
+            tests/reports/playwright-report/**
+            tests/reports/accessibility-report/**
+            tests/reports/axe-results.json
+            tests/reports/lighthouse-home.html
+      - name: Stop application stack
+        if: always()
+        run: docker compose down -v
+
+  performance:
+    name: k6 reservation API performance
+    runs-on: ubuntu-latest
+    needs: backend-quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: Start backend stack
+        run: docker compose up -d --build postgres redis backend
+      - name: Wait for backend
+        run: timeout 180 bash -c 'until curl -fsS http://127.0.0.1:8080/api/health; do sleep 5; done'
+      - name: Run reservation performance test
+        env:
+          BASE_URL: http://127.0.0.1:8080
+          VUS: '5'
+          DURATION: 30s
+        run: k6 run tests/perf/reservation-create.js
+      - name: Upload k6 report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-summary
+          path: tests/reports/k6-summary.json
+      - name: Stop backend stack
+        if: always()
+        run: docker compose down -v
+
+  zap-security:
+    name: OWASP ZAP baseline
+    runs-on: ubuntu-latest
+    needs: backend-quality
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start backend stack
+        run: docker compose up -d --build postgres redis backend
+      - name: Wait for backend
+        run: timeout 180 bash -c 'until curl -fsS http://127.0.0.1:8080/api/health; do sleep 5; done'
+      - name: Run ZAP baseline scan
+        run: |
+          mkdir -p tests/reports
+          docker run --rm --network host \
+            -v "$PWD/tests/reports:/zap/wrk" \
+            -v "$PWD/tests/security/zap-baseline.conf:/zap/wrk/zap-baseline.conf:ro" \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://127.0.0.1:8080 \
+            -c zap-baseline.conf \
+            -r zap_report.html \
+            -I
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: tests/reports/zap_report.html
+      - name: Stop backend stack
+        if: always()
+        run: docker compose down -v
+
+  sonar:
+    name: SonarQube analysis
+    runs-on: ubuntu-latest
+    needs: [backend-quality, frontend-quality]
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        if: ${{ env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        with:
+          name: backend-quality-reports
+          path: .
+      - uses: actions/download-artifact@v4
+        if: ${{ env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        with:
+          name: frontend-coverage
+          path: tests/reports/frontend-coverage
+      - name: Skip SonarQube when secrets are missing
+        if: ${{ env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '' }}
+        run: echo "SONAR_TOKEN or SONAR_HOST_URL is not configured; skipping SonarQube analysis."
+      - uses: SonarSource/sonarqube-scan-action@v5
+        if: ${{ env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  docker-build:
+    name: Docker compose build
+    runs-on: ubuntu-latest
+    needs: [backend-quality, frontend-quality]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build application images
+        run: docker compose build backend frontend
       - name: Export compose config
         run: docker compose config > compose.resolved.yml
       - uses: actions/upload-artifact@v4

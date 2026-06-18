@@ -1,0 +1,20 @@
+{
+  "consumer": { "name": "reservation" },
+  "provider": { "name": "cat" },
+  "interactions": [
+    {
+      "description": "reservation queries cat interaction and health constraints",
+      "request": { "method": "GET", "path": "/api/cats", "query": "storeId=1" },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "data": [
+            { "id": 1, "interaction_status": "AVAILABLE", "health_status": "NORMAL" }
+          ]
+        }
+      }
+    }
+  ],
+  "metadata": { "pactSpecification": { "version": "3.0.0" } }
+}

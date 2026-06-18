@@ -17,6 +17,9 @@ target/
 *.war
 *.log
 .mvn/
+.m2/
+backend/.jqwik-database/
+backend/.jqwik-database
 
 # Node.js
 node_modules/
@@ -35,6 +38,8 @@ redis-data/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+tests/reports/*
+!tests/reports/README.md
 
 # Helm
 *.tgz

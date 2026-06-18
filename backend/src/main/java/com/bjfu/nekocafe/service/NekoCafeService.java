@@ -15,9 +15,16 @@ import java.util.*;
 public class NekoCafeService {
     private final JdbcTemplate jdbc;
     private final MemberLevelPolicy levelPolicy;
-    public NekoCafeService(JdbcTemplate jdbc, MemberLevelPolicy levelPolicy) {
+    private final ReservationPolicy reservationPolicy;
+    private final CatInteractionPolicy catInteractionPolicy;
+    private final OrderAmountPolicy orderAmountPolicy;
+    public NekoCafeService(JdbcTemplate jdbc, MemberLevelPolicy levelPolicy, ReservationPolicy reservationPolicy,
+                           CatInteractionPolicy catInteractionPolicy, OrderAmountPolicy orderAmountPolicy) {
         this.jdbc = jdbc;
         this.levelPolicy = levelPolicy;
+        this.reservationPolicy = reservationPolicy;
+        this.catInteractionPolicy = catInteractionPolicy;
+        this.orderAmountPolicy = orderAmountPolicy;
     }
     public Map<String,Object> health() {
         Map<String,Object> m = new LinkedHashMap<String,Object>();
@@ -63,7 +70,7 @@ public class NekoCafeService {
     }
     @Transactional
     public Map<String,Object> createReservation(Long userId, Long storeId, LocalDate visitDate, String slot, Integer partySize, String requestId) {
-        if (partySize == null || partySize < 1 || partySize > 6) throw new BusinessException("INVALID_PARTY_SIZE", "预约人数必须为 1 到 6 人");
+        if (!reservationPolicy.isValidPartySize(partySize)) throw new BusinessException("INVALID_PARTY_SIZE", "预约人数必须为 1 到 6 人");
         if (visitDate.isBefore(LocalDate.now())) throw new BusinessException("INVALID_VISIT_DATE", "不能预约过去日期");
         List<Map<String,Object>> tables = jdbc.queryForList("SELECT * FROM dining_tables WHERE store_id=? AND capacity>=? ORDER BY capacity, id", storeId, partySize);
         if (tables.isEmpty()) throw new BusinessException("NO_TABLE", "当前门店没有匹配桌位");
@@ -91,7 +98,9 @@ public class NekoCafeService {
     public Map<String,Object> updateReservationStatus(Long id, String status) {
         Map<String,Object> r = reservation(id);
         String old = String.valueOf(r.get("status"));
-        if ("CANCELLED".equals(old) || "COMPLETED".equals(old)) throw new BusinessException("STATUS_CLOSED", "终态预约不能再次变更");
+        if (!reservationPolicy.isSupportedStatus(status)) throw new BusinessException("STATUS_UNSUPPORTED", "不支持的预约状态");
+        if (!reservationPolicy.canChangeStatus(old)) throw new BusinessException("STATUS_CLOSED", "终态预约不能再次变更");
+        if ("CHECKED_IN".equals(status) && !reservationPolicy.canCheckIn(old)) throw new BusinessException("STATUS_TRANSITION_ERROR", "只有已确认预约可到店核验");
         jdbc.update("UPDATE reservations SET status=? WHERE id=?", status, id);
         audit("staff", "UPDATE_RESERVATION_STATUS", "RESERVATION", String.valueOf(id), old + " -> " + status);
         return reservation(id);
@@ -110,6 +119,13 @@ public class NekoCafeService {
     }
     public Map<String,Object> recommendation(Long userId, Long storeId) {
         List<Map<String,Object>> catRows = jdbc.queryForList("SELECT * FROM cats WHERE store_id=? AND interaction_status='AVAILABLE' AND health_status IN ('NORMAL','WATCH') ORDER BY CASE WHEN health_status='NORMAL' THEN 0 ELSE 1 END, id LIMIT 3", storeId);
+        Iterator<Map<String,Object>> iterator = catRows.iterator();
+        while (iterator.hasNext()) {
+            Map<String,Object> cat = iterator.next();
+            if (!catInteractionPolicy.isRecommendable(String.valueOf(cat.get("interaction_status")), String.valueOf(cat.get("health_status")))) {
+                iterator.remove();
+            }
+        }
         List<Map<String,Object>> slotRows = slots(storeId, LocalDate.now().plusDays(1));
         Map<String,Object> data = new LinkedHashMap<String,Object>();
         data.put("reason", "根据猫咪互动状态、健康状态、明日时段余量和会员积分生成推荐");
@@ -118,7 +134,7 @@ public class NekoCafeService {
     }
     @Transactional
     public Map<String,Object> createOrder(Long userId, Long reservationId, Integer amountCents) {
-        if (amountCents == null || amountCents < 0) throw new BusinessException("INVALID_AMOUNT", "订单金额不合法");
+        if (!orderAmountPolicy.isValidAmount(amountCents)) throw new BusinessException("INVALID_AMOUNT", "订单金额不合法");
         String no = "ORD" + System.currentTimeMillis();
         jdbc.update("INSERT INTO orders(order_no,reservation_id,user_id,amount_cents,status) VALUES(?,?,?,?,?)", no, reservationId, userId, amountCents, "CREATED");
         Long id = jdbc.queryForObject("SELECT id FROM orders WHERE order_no=?", Long.class, no);
@@ -132,6 +148,14 @@ public class NekoCafeService {
         jdbc.update("UPDATE orders SET status='PAID', payment_channel=? WHERE id=?", channel == null ? "MOCK_PAY" : channel, id);
         jdbc.update("UPDATE members SET points=points+? WHERE user_id=?", ((Number)order.get("amount_cents")).intValue()/100, order.get("user_id"));
         return jdbc.queryForMap("SELECT * FROM orders WHERE id=?", id);
+    }
+    @Transactional
+    public Map<String,Object> createReview(Long userId, Long storeId, Integer rating, String content) {
+        if (rating == null || rating < 1 || rating > 5) throw new BusinessException("INVALID_RATING", "评分必须为 1 到 5");
+        jdbc.update("INSERT INTO reviews(user_id,store_id,rating,content,status) VALUES(?,?,?,?,?)", userId, storeId, rating, content, "OPEN");
+        Long id = jdbc.queryForObject("SELECT MAX(id) FROM reviews WHERE user_id=? AND store_id=?", Long.class, userId, storeId);
+        audit(String.valueOf(userId), "CREATE_REVIEW", "STORE", String.valueOf(storeId), "rating=" + rating);
+        return jdbc.queryForMap("SELECT * FROM reviews WHERE id=?", id);
     }
     public Map<String,Object> dashboard() {
         Map<String,Object> data = new LinkedHashMap<String,Object>();

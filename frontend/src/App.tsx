@@ -399,7 +399,7 @@ function CatCarePanel() {
                       onClick={() => {
                         healthMut.mutate({
                           catId: cat.id,
-                          body: { recordType: healthType, valueText: healthNote || healthType, recordedBy: 'catkeeper' }
+                          body: { recordType: healthType, value: healthNote || healthType, recordedBy: 'catkeeper' }
                         });
                         setAddingHealthFor(null);
                         setHealthType('');
