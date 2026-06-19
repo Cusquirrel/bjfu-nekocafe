@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { apiBase, futureDate, openHome, uniqueId } from './e2e-fixtures';
+import { apiBase, createReservation, openHome, uniqueId } from './e2e-fixtures';
 
 test('new user registers, browses stores, reserves, then cancels', async ({ page, request }) => {
   await openHome(page);
-  await expect(page.getByText('森林猫咖·学院路店')).toBeVisible();
+  await expect(page.locator('option', { hasText: '森林猫咖·学院路店' })).toHaveCount(1);
 
   const username = uniqueId('e2e_user');
   const register = await request.post(`${apiBase}/auth/register`, {
@@ -16,18 +16,7 @@ test('new user registers, browses stores, reserves, then cancels', async ({ page
   expect(stores.ok()).toBeTruthy();
   expect((await stores.json()).data.length).toBeGreaterThan(0);
 
-  const reservation = await request.post(`${apiBase}/reservations`, {
-    data: {
-      userId: user.id,
-      storeId: 1,
-      visitDate: futureDate(3),
-      slot: '12:00-14:00',
-      partySize: 2,
-      requestId: uniqueId('e2e-new-reserve'),
-    },
-  });
-  expect(reservation.ok()).toBeTruthy();
-  const reservationData = (await reservation.json()).data;
+  const reservationData = await createReservation(request, 'e2e-new-reserve', 3, user.id);
   expect(reservationData.status).toBe('CONFIRMED');
 
   const cancel = await request.post(`${apiBase}/reservations/${reservationData.id}/cancel`);

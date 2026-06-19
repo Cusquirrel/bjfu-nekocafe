@@ -19,7 +19,7 @@ test('staff checks in reservation, completes service, and sees dashboard update'
 
   await openHome(page);
   await page.getByRole('button', { name: /运营看板/ }).click();
-  await expect(page.getByText('运营看板')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '运营看板' })).toBeVisible();
 
   const dashboard = await request.get(`${apiBase}/dashboard/overview`);
   expect(dashboard.ok()).toBeTruthy();

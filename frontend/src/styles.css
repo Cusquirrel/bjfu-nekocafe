@@ -5,8 +5,8 @@
   --green-800: #166534; --green-900: #14532d;
   --primary: #0d7a45; --primary-light: #31a263; --primary-dark: #0c5a34;
   --bg: #eff8f1; --surface: #ffffff; --border: #d5eadb;
-  --text: #173a2b; --text-secondary: #5f756a; --text-muted: #8fa398;
-  --danger: #ef4444; --warning: #f59e0b; --info: #3b82f6;
+  --text: #173a2b; --text-secondary: #4f675c; --text-muted: #4f675c;
+  --danger: #b91c1c; --warning: #b45309; --info: #1d4ed8;
   --shadow-sm: 0 2px 8px rgba(0,80,42,.06);
   --shadow-md: 0 8px 24px rgba(0,80,42,.08);
   --shadow-lg: 0 16px 40px rgba(0,80,42,.10);
@@ -148,7 +148,7 @@ h1, h2, h3, p { margin: 0 0 12px; }
   display: flex; gap: 24px; margin-bottom: 16px;
   font-size: 14px; color: var(--text-secondary); padding: 0 4px;
 }
-.text-success { color: var(--green-600); }
+.text-success { color: var(--green-800); }
 .text-danger { color: var(--danger); }
 
 /* ─── Slot Grid ─── */

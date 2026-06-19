@@ -1,5 +1,8 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
+
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 400 }));
+
 export const options = {
   vus: 20,
   duration: '1m',

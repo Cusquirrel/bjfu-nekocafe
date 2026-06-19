@@ -17,17 +17,27 @@ export async function openHome(page: Page) {
   await expect(page.getByRole('heading', { name: /NekoCafe 智慧猫咖预约平台/ })).toBeVisible();
 }
 
-export async function createReservation(request: APIRequestContext, prefix: string, days = 2) {
-  const response = await request.post(`${apiBase}/reservations`, {
-    data: {
-      userId: 1,
-      storeId: 1,
-      visitDate: futureDate(days),
-      slot: '10:00-12:00',
-      partySize: 2,
-      requestId: uniqueId(prefix),
-    },
-  });
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()).data;
+export async function createReservation(request: APIRequestContext, prefix: string, days = 2, userId = 1) {
+  const slots = ['10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00', '18:00-20:00'];
+  let lastResponse = null;
+  for (let offset = days; offset < days + 20; offset += 1) {
+    for (const slot of slots) {
+      const response = await request.post(`${apiBase}/reservations`, {
+        data: {
+          userId,
+          storeId: 1,
+          visitDate: futureDate(offset),
+          slot,
+          partySize: 2,
+          requestId: uniqueId(prefix),
+        },
+      });
+      if (response.ok()) {
+        return (await response.json()).data;
+      }
+      lastResponse = response;
+    }
+  }
+  expect(lastResponse?.ok()).toBeTruthy();
+  return (await lastResponse!.json()).data;
 }

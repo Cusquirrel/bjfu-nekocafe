@@ -98,8 +98,9 @@ function ReservationPanel() {
 
         {/* 日期选择 */}
         <div className="date-picker">
-          <label className="date-label">预约日期</label>
+          <label className="date-label" htmlFor="reservation-date">预约日期</label>
           <input
+            id="reservation-date"
             type="date"
             value={selectedDate}
             min={tomorrow()}
@@ -377,6 +378,7 @@ function CatCarePanel() {
               {addingHealthFor === cat.id && (
                 <div className="health-form">
                   <select
+                    aria-label="猫咪健康记录类型"
                     value={healthType}
                     onChange={(e) => setHealthType(e.target.value)}
                   >
@@ -387,6 +389,7 @@ function CatCarePanel() {
                     <option value="VACCINATION">疫苗记录</option>
                   </select>
                   <input
+                    aria-label="猫咪健康记录备注"
                     type="text"
                     placeholder="备注信息..."
                     value={healthNote}
@@ -517,9 +520,10 @@ export default function App() {
         </div>
         <div className="hero-actions">
           <div className="store-selector">
-            <label className="selector-label">当前门店</label>
+            <label className="selector-label" htmlFor="store-selector">当前门店</label>
             {stores.isLoading && <span className="selector-loading">加载中...</span>}
             <select
+              id="store-selector"
               value={storeId || ''}
               onChange={(e) => setStoreId(Number(e.target.value))}
               className="store-select"
